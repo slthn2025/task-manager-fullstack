@@ -10,17 +10,22 @@ const createTask = async (req, res) => {
       user: req.user._id,
     });
 
-    res.status(201).json(task);
+    const populatedTask = await task.populate("user", "name email");
+
+    res.status(201).json(populatedTask);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
 
 
+
 // GET ALL TASKS (by logged user)
 const getTasks = async (req, res) => {
   try {
-    const tasks = await Task.find({ user: req.user._id });
+    const tasks = await Task.find({ user: req.user._id })
+      .populate("user", "name email"); // hanya ambil name & email
+
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ message: error.message });
