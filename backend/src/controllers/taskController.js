@@ -23,14 +23,43 @@ const createTask = async (req, res) => {
 // GET ALL TASKS (by logged user)
 const getTasks = async (req, res) => {
   try {
-    const tasks = await Task.find({ user: req.user._id })
-      .populate("user", "name email"); // hanya ambil name & email
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const search = req.query.search || "";
+    const status = req.query.status;
 
-    res.json(tasks);
+    const skip = (page - 1) * limit;
+
+    // Query filter
+    let query = {
+      user: req.user._id,
+      title: { $regex: search, $options: "i" }, // case insensitive
+    };
+
+    if (status) {
+      query.status = status;
+    }
+
+    const total = await Task.countDocuments(query);
+
+    const tasks = await Task.find(query)
+      .populate("user", "name email")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    res.json({
+      tasks,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalTasks: total,
+    });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 
 // UPDATE TASK
