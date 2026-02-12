@@ -110,9 +110,43 @@ const deleteTask = async (req, res) => {
 };
 
 
+const getTaskStats = async (req, res) => {
+  try {
+    const stats = await Task.aggregate([
+      {
+        $match: { user: req.user._id }
+      },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Format hasil supaya lebih rapi
+    const formattedStats = {
+      totalTasks: 0,
+      pending: 0,
+      "in-progress": 0,
+      completed: 0
+    };
+
+    stats.forEach(item => {
+      formattedStats[item._id] = item.count;
+      formattedStats.totalTasks += item.count;
+    });
+
+    res.json(formattedStats);
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 module.exports = {
   createTask,
   getTasks,
   updateTask,
   deleteTask,
+  getTaskStats
 };
