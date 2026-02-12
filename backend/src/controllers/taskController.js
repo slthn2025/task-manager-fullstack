@@ -39,6 +39,15 @@ const getTasks = async (req, res) => {
     if (status) {
       query.status = status;
     }
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+
+    if (startDate && endDate) {
+    query.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+    };
+    }
 
     const total = await Task.countDocuments(query);
 
@@ -112,10 +121,15 @@ const deleteTask = async (req, res) => {
 
 const getTaskStats = async (req, res) => {
   try {
+
+    let matchStage = {};
+
+    if (req.user.role !== "admin") {
+      matchStage.user = req.user._id;
+    }
+
     const stats = await Task.aggregate([
-      {
-        $match: { user: req.user._id }
-      },
+      { $match: matchStage },
       {
         $group: {
           _id: "$status",
@@ -124,7 +138,6 @@ const getTaskStats = async (req, res) => {
       }
     ]);
 
-    // Format hasil supaya lebih rapi
     const formattedStats = {
       totalTasks: 0,
       pending: 0,
@@ -143,10 +156,38 @@ const getTaskStats = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+const getMonthlyStats = async (req, res) => {
+  try {
+
+    let matchStage = {};
+
+    if (req.user.role !== "admin") {
+      matchStage.user = req.user._id;
+    }
+
+    const stats = await Task.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: { $month: "$createdAt" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id": 1 } }
+    ]);
+
+    res.json(stats);
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createTask,
   getTasks,
   updateTask,
   deleteTask,
-  getTaskStats
+  getTaskStats,
+  getMonthlyStats
 };
