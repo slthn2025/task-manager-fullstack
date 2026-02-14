@@ -1,22 +1,33 @@
-const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
-const connectDB = require("./config/db");
-const authRoutes = require("./routes/authRoutes");
-const userRoutes = require("./routes/userRoutes");
-const taskRoutes = require("./routes/taskRoutes");
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+
+import connectDB from "./config/db.js";
+import authRoutes from "./routes/authRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+import taskRoutes from "./routes/taskRoutes.js";
+import errorHandler from "./middleware/errorHandler.js";
 
 dotenv.config();
+
+// Connect Database
 connectDB();
 
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
+
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/tasks", taskRoutes);
 
+// Global Error Handler
+app.use(errorHandler);
+
+// Test Route
 app.get("/", (req, res) => {
   res.json({ message: "API running 🚀" });
 });

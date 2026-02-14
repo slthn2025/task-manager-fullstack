@@ -1,8 +1,20 @@
 const Task = require("../models/Task");
 
+/* =========================================
+   Helper Response Function
+========================================= */
+const sendResponse = (res, statusCode, message, data = null) => {
+  return res.status(statusCode).json({
+    success: true,
+    message,
+    data,
+  });
+};
 
-// CREATE TASK
-const createTask = async (req, res) => {
+/* =========================================
+   CREATE TASK
+========================================= */
+const createTask = async (req, res, next) => {
   try {
     const task = await Task.create({
       title: req.body.title,
@@ -12,41 +24,40 @@ const createTask = async (req, res) => {
 
     const populatedTask = await task.populate("user", "name email");
 
-    res.status(201).json(populatedTask);
+    return sendResponse(res, 201, "Task created successfully", populatedTask);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    next(error);
   }
 };
 
-
-
-// GET ALL TASKS (by logged user)
-const getTasks = async (req, res) => {
+/* =========================================
+   GET TASKS (Pagination + Search + Filter)
+========================================= */
+const getTasks = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 5;
     const search = req.query.search || "";
     const status = req.query.status;
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
 
     const skip = (page - 1) * limit;
 
-    // Query filter
     let query = {
       user: req.user._id,
-      title: { $regex: search, $options: "i" }, // case insensitive
+      title: { $regex: search, $options: "i" },
     };
 
     if (status) {
       query.status = status;
     }
-    const startDate = req.query.startDate;
-    const endDate = req.query.endDate;
 
     if (startDate && endDate) {
-    query.createdAt = {
+      query.createdAt = {
         $gte: new Date(startDate),
-        $lte: new Date(endDate)
-    };
+        $lte: new Date(endDate),
+      };
     }
 
     const total = await Task.countDocuments(query);
@@ -57,71 +68,76 @@ const getTasks = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
-    res.json({
+    return sendResponse(res, 200, "Tasks fetched successfully", {
       tasks,
       currentPage: page,
       totalPages: Math.ceil(total / limit),
       totalTasks: total,
     });
-
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-
-
-// UPDATE TASK
-const updateTask = async (req, res) => {
+/* =========================================
+   UPDATE TASK
+========================================= */
+const updateTask = async (req, res, next) => {
   try {
     const task = await Task.findById(req.params.id);
 
     if (!task) {
-      return res.status(404).json({ message: "Task not found" });
+      res.status(404);
+      throw new Error("Task not found");
     }
 
     if (task.user.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: "Not authorized" });
+      res.status(401);
+      throw new Error("Not authorized");
     }
 
-    task.title = req.body.title || task.title;
-    task.description = req.body.description || task.description;
-    task.status = req.body.status || task.status;
+    task.title = req.body.title ?? task.title;
+    task.description = req.body.description ?? task.description;
+    task.status = req.body.status ?? task.status;
 
     const updatedTask = await task.save();
 
-    res.json(updatedTask);
+    return sendResponse(res, 200, "Task updated successfully", updatedTask);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    next(error);
   }
 };
 
-
-// DELETE TASK
-const deleteTask = async (req, res) => {
+/* =========================================
+   DELETE TASK
+========================================= */
+const deleteTask = async (req, res, next) => {
   try {
     const task = await Task.findById(req.params.id);
 
     if (!task) {
-      return res.status(404).json({ message: "Task not found" });
+      res.status(404);
+      throw new Error("Task not found");
     }
 
     if (task.user.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: "Not authorized" });
+      res.status(401);
+      throw new Error("Not authorized");
     }
 
     await task.deleteOne();
 
-    res.json({ message: "Task deleted" });
+    return sendResponse(res, 200, "Task deleted successfully");
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    next(error);
   }
 };
 
-
-const getTaskStats = async (req, res) => {
+/* =========================================
+   TASK STATUS STATS
+========================================= */
+const getTaskStats = async (req, res, next) => {
   try {
-
     let matchStage = {};
 
     if (req.user.role !== "admin") {
@@ -133,32 +149,34 @@ const getTaskStats = async (req, res) => {
       {
         $group: {
           _id: "$status",
-          count: { $sum: 1 }
-        }
-      }
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
     const formattedStats = {
       totalTasks: 0,
       pending: 0,
       "in-progress": 0,
-      completed: 0
+      completed: 0,
     };
 
-    stats.forEach(item => {
+    stats.forEach((item) => {
       formattedStats[item._id] = item.count;
       formattedStats.totalTasks += item.count;
     });
 
-    res.json(formattedStats);
-
+    return sendResponse(res, 200, "Task stats fetched successfully", formattedStats);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
-const getMonthlyStats = async (req, res) => {
-  try {
 
+/* =========================================
+   MONTHLY STATS
+========================================= */
+const getMonthlyStats = async (req, res, next) => {
+  try {
     let matchStage = {};
 
     if (req.user.role !== "admin") {
@@ -170,16 +188,15 @@ const getMonthlyStats = async (req, res) => {
       {
         $group: {
           _id: { $month: "$createdAt" },
-          count: { $sum: 1 }
-        }
+          count: { $sum: 1 },
+        },
       },
-      { $sort: { "_id": 1 } }
+      { $sort: { "_id": 1 } },
     ]);
 
-    res.json(stats);
-
+    return sendResponse(res, 200, "Monthly stats fetched successfully", stats);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
@@ -189,5 +206,5 @@ module.exports = {
   updateTask,
   deleteTask,
   getTaskStats,
-  getMonthlyStats
+  getMonthlyStats,
 };
