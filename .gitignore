@@ -5,7 +5,8 @@ build
 
 # Env
 .env
-.env.*
+.env.local
+# .env.*
 
 # Logs
 logs
