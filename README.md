@@ -2,15 +2,6 @@
 
 A modern fullstack Task Management application built using the MERN stack with JWT authentication, protected routes, and a clean responsive UI with Dark Mode support.
 
----
-
-## 📌 Live Demo
-
-Frontend: https://your-frontend-url.vercel.app  
-Backend API: https://your-backend-url.onrender.com
-
----
-
 ## 🛠 Tech Stack
 
 ### Backend
